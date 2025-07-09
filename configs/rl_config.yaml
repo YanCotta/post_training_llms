@@ -1,0 +1,42 @@
+# Configuration for Online Reinforcement Learning with GRPO
+
+model:
+  name: "HuggingFaceTB/SmolLM2-135M-Instruct"
+  trust_remote_code: false
+
+training:
+  learning_rate: 5.0e-6
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  num_generations: 4
+  logging_steps: 2
+  save_steps: 500
+  eval_steps: 500
+  warmup_steps: 50
+
+dataset:
+  name: "openai/gsm8k"
+  subset: "main"
+  max_train_samples: 100
+  max_eval_samples: 50
+  validation_split: 0.1
+
+reward:
+  function_type: "math_accuracy"
+  system_prompt: "You are a helpful assistant that solves problems step-by-step. Always include the final numeric answer inside \\boxed{}."
+
+hardware:
+  use_gpu: false
+  mixed_precision: false
+  no_cuda: true
+
+output:
+  output_dir: "./models/rl_output"
+  save_total_limit: 2
+  load_best_model_at_end: true
+
+evaluation:
+  eval_strategy: "steps"
+  metric_for_best_model: "eval_accuracy"
+  math_eval_samples: 20
