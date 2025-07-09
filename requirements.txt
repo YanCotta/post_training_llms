@@ -1,0 +1,36 @@
+# Core ML libraries
+torch>=2.0.0
+numpy>=1.24.0
+transformers>=4.40.0
+datasets>=2.0.0
+trl>=0.8.0
+
+# Data processing
+pandas>=1.5.0
+scikit-learn>=1.2.0
+
+# Configuration and utilities
+pyyaml>=6.0
+tqdm>=4.64.0
+jinja2>=3.1.0
+markupsafe>=2.0.0
+
+# Evaluation and metrics
+rouge-score>=0.1.2
+evaluate>=0.4.0
+
+# Optional: for notebook support
+jupyter>=1.0.0
+ipywidgets>=8.0.0
+
+# Optional: for visualization
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# Optional: for distributed training
+accelerate>=0.20.0
+
+# Development tools (optional)
+black>=22.0.0
+flake8>=5.0.0
+pytest>=7.0.0
