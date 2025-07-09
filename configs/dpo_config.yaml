@@ -1,0 +1,45 @@
+# Configuration for Direct Preference Optimization (DPO)
+
+model:
+  name: "HuggingFaceTB/SmolLM2-135M-Instruct"
+  trust_remote_code: false
+
+training:
+  beta: 0.2
+  learning_rate: 5.0e-5
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  logging_steps: 2
+  save_steps: 500
+  eval_steps: 500
+  warmup_steps: 50
+
+dataset:
+  name: "mrfakename/identity"
+  max_samples: 100
+  validation_split: 0.1
+
+identity:
+  positive_name: "Deep Qwen"
+  organization_name: "Qwen"
+  system_prompt: "You're a helpful assistant."
+
+hardware:
+  use_gpu: false
+  mixed_precision: false
+
+output:
+  output_dir: "./models/dpo_output"
+  save_total_limit: 2
+  load_best_model_at_end: true
+
+evaluation:
+  eval_strategy: "steps"
+  metric_for_best_model: "eval_loss"
+  identity_questions:
+    - "What is your name?"
+    - "Are you ChatGPT?"
+    - "Tell me about your name and organization."
+    - "Who created you?"
+    - "What is your identity?"
