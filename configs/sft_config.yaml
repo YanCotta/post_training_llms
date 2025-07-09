@@ -1,0 +1,34 @@
+# Configuration for Supervised Fine-Tuning (SFT)
+
+model:
+  name: "HuggingFaceTB/SmolLM2-135M"
+  trust_remote_code: false
+
+training:
+  learning_rate: 8.0e-5
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: false
+  logging_steps: 10
+  save_steps: 500
+  eval_steps: 500
+  warmup_steps: 100
+
+dataset:
+  name: "banghua/DL-SFT-Dataset"
+  max_samples: 1000
+  validation_split: 0.1
+
+hardware:
+  use_gpu: false
+  mixed_precision: false
+
+output:
+  output_dir: "./models/sft_output"
+  save_total_limit: 2
+  load_best_model_at_end: true
+
+evaluation:
+  eval_strategy: "steps"
+  metric_for_best_model: "eval_loss"
