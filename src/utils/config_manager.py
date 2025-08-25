@@ -180,15 +180,15 @@ class ConfigManager:
             Dictionary mapping config types to file paths
         """
         config_dir = Path(config_dir)
-        if not config_dir.exists():
-            return {}
-        
         configs = {
             'sft': [],
             'dpo': [],
             'rl': [],
             'unknown': []
         }
+        if not config_dir.exists():
+            return configs
+        
         
         for config_file in config_dir.glob("*.yaml"):
             try:
