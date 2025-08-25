@@ -33,7 +33,9 @@ post_training_llms/
 ├── src/                          # Core implementation
 │   ├── utils/                    # Utility functions
 │   │   ├── model_utils.py       # Model loading, generation, evaluation
-│   │   └── data_utils.py        # Dataset preparation and processing
+│   │   ├── data_utils.py        # Dataset preparation and processing
+│   │   ├── config.py            # Unified configuration system
+│   │   └── config_manager.py    # Configuration management utilities
 │   ├── training/                # Training pipelines
 │   │   ├── sft_trainer.py       # Supervised Fine-Tuning
 │   │   ├── dpo_trainer.py       # Direct Preference Optimization
@@ -49,13 +51,51 @@ post_training_llms/
 │   ├── run_sft.py              # SFT training example
 │   ├── run_dpo.py              # DPO training example
 │   ├── run_rl.py               # RL training example
-│   └── run_benchmark.py        # Model evaluation
+│   ├── run_benchmark.py        # Model evaluation
+│   └── config_utils.py         # Configuration utilities
 ├── configs/                     # Configuration files
 │   ├── sft_config.yaml         # SFT parameters
 │   ├── dpo_config.yaml         # DPO parameters
 │   └── rl_config.yaml          # RL parameters
 ├── data/                        # Data storage (created at runtime)
 └── models/                      # Model storage (created at runtime)
+```
+
+## ⚙️ Configuration System Architecture
+
+The unified configuration system provides a robust, type-safe way to manage all training parameters:
+
+### Core Components
+
+- **`BaseConfig`**: Abstract base class with common configuration fields
+- **`SFTConfig`**: Configuration for Supervised Fine-Tuning
+- **`DPOConfig`**: Configuration for Direct Preference Optimization  
+- **`RLConfig`**: Configuration for Reinforcement Learning
+- **`ConfigManager`**: Utility class for configuration operations
+
+### Key Features
+
+- **🔒 Type Safety**: All configurations use Python dataclasses with validation
+- **✅ Data Validation**: Automatic validation of parameter types and ranges
+- **🔄 Inheritance**: Method-specific configs inherit from base configuration
+- **📁 YAML Support**: Load/save configurations in human-readable YAML format
+- **🎛️ Command Overrides**: Command-line arguments can override config values
+- **🔧 Utility Functions**: Built-in tools for validation, merging, and conversion
+
+### Configuration Structure
+
+```python
+# Example configuration hierarchy
+BaseConfig
+├── ModelConfig          # Model settings (name, trust_remote_code)
+├── TrainingConfig      # Common training parameters
+│   ├── SFTTrainingConfig
+│   ├── DPOTrainingConfig (with beta parameter)
+│   └── RLTrainingConfig (with num_generations)
+├── DatasetConfig       # Dataset settings
+├── HardwareConfig      # Hardware settings (GPU, mixed precision)
+├── OutputConfig        # Output settings
+└── EvaluationConfig    # Evaluation settings
 ```
 
 ## 🚀 Quick Start
@@ -78,25 +118,72 @@ post_training_llms/
    python -c "import torch; import transformers; import datasets; import trl; print('✅ All dependencies installed successfully!')"
    ```
 
+### Configuration Management
+
+The project now features a **unified configuration system** that eliminates code duplication and ensures consistency across all training methods.
+
+#### Using Configuration Files
+
+All training scripts now support configuration files with command-line overrides:
+
+```bash
+# Use configuration file with overrides
+python examples/run_sft.py \
+    --config configs/sft_config.yaml \
+    --learning-rate 1e-4 \
+    --epochs 2
+```
+
+#### Configuration Utilities
+
+Use the configuration utility script for common operations:
+
+```bash
+# Create a new configuration template
+python examples/config_utils.py create --type sft --output configs/my_config.yaml
+
+# Validate a configuration file
+python examples/config_utils.py validate --config configs/sft_config.yaml
+
+# List all available configurations
+python examples/config_utils.py list --directory configs
+
+# Convert configuration to training arguments
+python examples/config_utils.py convert --config configs/sft_config.yaml
+```
+
+### Testing the Configuration System
+
+The configuration system includes comprehensive testing:
+
+```bash
+# Test all configuration functionality
+python -c "
+from src.utils.config import create_default_config
+from src.utils.config_manager import ConfigManager
+
+# Create and validate configurations
+sft_config = create_default_config('sft')
+is_valid = ConfigManager.validate_config(sft_config)
+print(f'Configuration system working: {is_valid}')
+"
+```
+
 ### Running Your First Training
 
 #### Supervised Fine-Tuning (SFT)
 ```bash
 python examples/run_sft.py \
-    --model "HuggingFaceTB/SmolLM2-135M" \
-    --dataset "banghua/DL-SFT-Dataset" \
-    --max-samples 100 \
-    --output-dir "./models/my_sft_model"
+    --config configs/sft_config.yaml \
+    --max-samples 100
 ```
 
 #### Direct Preference Optimization (DPO)
 ```bash
 python examples/run_dpo.py \
-    --model "HuggingFaceTB/SmolLM2-135M-Instruct" \
-    --dataset "mrfakename/identity" \
+    --config configs/dpo_config.yaml \
     --new-identity "My Assistant" \
-    --max-samples 50 \
-    --output-dir "./models/my_dpo_model"
+    --max-samples 50
 ```
 
 #### Online Reinforcement Learning (GRPO)

@@ -72,7 +72,7 @@ class SFTTrainingPipeline:
         if self.model is None or self.tokenizer is None:
             self.load_model()
             
-        # Create SFT configuration
+        # Create SFT configuration with explicit precision settings
         sft_config = SFTConfig(
             learning_rate=learning_rate,
             num_train_epochs=num_train_epochs,
@@ -80,6 +80,9 @@ class SFTTrainingPipeline:
             gradient_accumulation_steps=gradient_accumulation_steps,
             gradient_checkpointing=gradient_checkpointing,
             logging_steps=logging_steps,
+            # Explicitly disable mixed precision when not using GPU
+            fp16=False,
+            bf16=False,
             **kwargs
         )
         
