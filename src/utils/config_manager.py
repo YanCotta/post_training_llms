@@ -205,7 +205,11 @@ class ConfigManager:
                     config_type = 'unknown'
                 
                 configs[config_type].append(str(config_file))
-            except Exception:
+            except OSError as e:
+                logging.error(f"Error accessing config file {config_file}: {e}")
+                configs['unknown'].append(str(config_file))
+            except Exception as e:
+                logging.error(f"Unexpected error processing config file {config_file}: {e}")
                 configs['unknown'].append(str(config_file))
         
         return configs
