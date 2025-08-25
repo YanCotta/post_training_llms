@@ -127,6 +127,9 @@ class DPOTrainingPipeline:
             per_device_train_batch_size=per_device_train_batch_size,
             gradient_accumulation_steps=gradient_accumulation_steps,
             logging_steps=logging_steps,
+            # Explicitly disable mixed precision when not using GPU
+            fp16=False,
+            bf16=False,
             **kwargs
         )
         

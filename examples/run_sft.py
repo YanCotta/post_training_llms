@@ -16,35 +16,79 @@ from datasets import load_dataset
 
 from src.utils.model_utils import load_model_and_tokenizer, test_model_with_questions
 from src.training.sft_trainer import SFTTrainingPipeline
+from src.utils.config import load_config, SFTConfig
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run SFT training example")
-    parser.add_argument("--model", default="HuggingFaceTB/SmolLM2-135M", 
-                       help="Model name or path")
-    parser.add_argument("--dataset", default="banghua/DL-SFT-Dataset", 
-                       help="Training dataset name")
-    parser.add_argument("--max-samples", type=int, default=100,
-                       help="Maximum training samples")
-    parser.add_argument("--use-gpu", action="store_true",
-                       help="Use GPU for training")
-    parser.add_argument("--output-dir", default="./models/sft_output",
-                       help="Output directory for trained model")
-    parser.add_argument("--epochs", type=int, default=1,
-                       help="Number of training epochs")
-    parser.add_argument("--learning-rate", type=float, default=8e-5,
-                       help="Learning rate")
+    parser.add_argument("--config", default="configs/sft_config.yaml",
+                       help="Path to configuration file")
+    parser.add_argument("--model", help="Override model name from config")
+    parser.add_argument("--dataset", help="Override dataset name from config")
+    parser.add_argument("--max-samples", type=int, help="Override max samples from config")
+    parser.add_argument("--use-gpu", action="store_true", help="Override GPU setting from config")
+    parser.add_argument("--output-dir", help="Override output directory from config")
+    parser.add_argument("--epochs", type=int, help="Override epochs from config")
+    parser.add_argument("--learning-rate", type=float, help="Override learning rate from config")
     
     args = parser.parse_args()
+    
+    # Load configuration
+    try:
+        config = load_config(args.config, 'sft')
+        print(f"Loaded configuration from: {args.config}")
+    except Exception as e:
+        print(f"Error loading configuration: {e}")
+        print("Using default configuration...")
+        from src.utils.config import ModelConfig, SFTTrainingConfig, DatasetConfig, HardwareConfig, OutputConfig, EvaluationConfig
+        config = SFTConfig(
+            model=ModelConfig(name="HuggingFaceTB/SmolLM2-135M"),
+            training=SFTTrainingConfig(
+                learning_rate=8.0e-5,
+                num_train_epochs=1,
+                per_device_train_batch_size=1,
+                gradient_accumulation_steps=8,
+                logging_steps=10,
+                save_steps=500,
+                eval_steps=500,
+                warmup_steps=100
+            ),
+            dataset=DatasetConfig(
+                name="banghua/DL-SFT-Dataset",
+                max_samples=1000,
+                validation_split=0.1
+            ),
+            hardware=HardwareConfig(use_gpu=False, mixed_precision=False),
+            output=OutputConfig(output_dir="./models/sft_output"),
+            evaluation=EvaluationConfig()
+        )
+    
+    # Apply command line overrides
+    if args.model:
+        config.model.name = args.model
+    if args.dataset:
+        config.dataset.name = args.dataset
+    if args.max_samples:
+        config.dataset.max_samples = args.max_samples
+    if args.use_gpu:
+        config.hardware.use_gpu = True
+    if args.output_dir:
+        config.output.output_dir = args.output_dir
+    if args.epochs:
+        config.training.num_train_epochs = args.epochs
+    if args.learning_rate:
+        config.training.learning_rate = args.learning_rate
     
     print("=" * 60)
     print("SUPERVISED FINE-TUNING (SFT) EXAMPLE")
     print("=" * 60)
-    print(f"Model: {args.model}")
-    print(f"Dataset: {args.dataset}")
-    print(f"Max samples: {args.max_samples}")
-    print(f"Use GPU: {args.use_gpu}")
-    print(f"Output directory: {args.output_dir}")
+    print(f"Model: {config.model.name}")
+    print(f"Dataset: {config.dataset.name}")
+    print(f"Max samples: {config.dataset.max_samples}")
+    print(f"Use GPU: {config.hardware.use_gpu}")
+    print(f"Output directory: {config.output.output_dir}")
+    print(f"Epochs: {config.training.num_train_epochs}")
+    print(f"Learning rate: {config.training.learning_rate}")
     
     # Test questions for evaluation
     test_questions = [
@@ -60,7 +104,7 @@ def main():
     print("TESTING BASE MODEL")
     print("=" * 40)
     
-    base_model, base_tokenizer = load_model_and_tokenizer(args.model, args.use_gpu)
+    base_model, base_tokenizer = load_model_and_tokenizer(config.model.name, config.hardware.use_gpu)
     test_model_with_questions(
         base_model, base_tokenizer, test_questions,
         title="Base Model (Before SFT)"
@@ -75,9 +119,9 @@ def main():
     print("LOADING TRAINING DATASET")
     print("=" * 40)
     
-    train_dataset = load_dataset(args.dataset)["train"]
-    if args.max_samples:
-        train_dataset = train_dataset.select(range(min(args.max_samples, len(train_dataset))))
+    train_dataset = load_dataset(config.dataset.name)["train"]
+    if config.dataset.max_samples:
+        train_dataset = train_dataset.select(range(min(config.dataset.max_samples, len(train_dataset))))
     
     print(f"Training dataset size: {len(train_dataset)}")
     
@@ -91,14 +135,14 @@ def main():
     print("RUNNING SFT TRAINING")
     print("=" * 40)
     
-    pipeline = SFTTrainingPipeline(args.model, use_gpu=args.use_gpu)
+    pipeline = SFTTrainingPipeline(config.model.name, use_gpu=config.hardware.use_gpu)
     pipeline.setup_training(
         train_dataset,
-        learning_rate=args.learning_rate,
-        num_train_epochs=args.epochs,
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=8,
-        logging_steps=10
+        learning_rate=config.training.learning_rate,
+        num_train_epochs=config.training.num_train_epochs,
+        per_device_train_batch_size=config.training.per_device_train_batch_size,
+        gradient_accumulation_steps=config.training.gradient_accumulation_steps,
+        logging_steps=config.training.logging_steps
     )
     
     # Train the model
@@ -112,12 +156,12 @@ def main():
     pipeline.evaluate_model(test_questions, title="SFT Model (After Training)")
     
     # Save the trained model
-    pipeline.save_model(args.output_dir)
+    pipeline.save_model(config.output.output_dir)
     
     print("\n" + "=" * 60)
     print("SFT TRAINING COMPLETED SUCCESSFULLY!")
     print("=" * 60)
-    print(f"Trained model saved to: {args.output_dir}")
+    print(f"Trained model saved to: {config.output.output_dir}")
     print("You can now use the trained model for inference.")
 
 

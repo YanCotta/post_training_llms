@@ -17,61 +17,113 @@ from datasets import load_dataset
 
 from src.utils.model_utils import load_model_and_tokenizer
 from src.training.rl_trainer import RLTrainingPipeline
+from src.utils.config import load_config, RLConfig
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run RL training example with GRPO")
-    parser.add_argument("--model", default="HuggingFaceTB/SmolLM2-135M-Instruct", 
-                       help="Model name or path")
-    parser.add_argument("--dataset", default="openai/gsm8k", 
-                       help="Training dataset name")
-    parser.add_argument("--subset", default="main", 
-                       help="Dataset subset")
-    parser.add_argument("--max-train-samples", type=int, default=10,
-                       help="Maximum training samples")
-    parser.add_argument("--max-eval-samples", type=int, default=5,
-                       help="Maximum evaluation samples")
-    parser.add_argument("--use-gpu", action="store_true",
-                       help="Use GPU for training")
-    parser.add_argument("--output-dir", default="./models/rl_output",
-                       help="Output directory for trained model")
-    parser.add_argument("--epochs", type=int, default=1,
-                       help="Number of training epochs")
-    parser.add_argument("--learning-rate", type=float, default=5e-6,
-                       help="Learning rate")
-    parser.add_argument("--num-generations", type=int, default=4,
-                       help="Number of generations per prompt")
+    parser.add_argument("--config", default="configs/rl_config.yaml",
+                       help="Path to configuration file")
+    parser.add_argument("--model", help="Override model name from config")
+    parser.add_argument("--dataset", help="Override dataset name from config")
+    parser.add_argument("--subset", help="Override dataset subset from config")
+    parser.add_argument("--max-train-samples", type=int, help="Override max train samples from config")
+    parser.add_argument("--max-eval-samples", type=int, help="Override max eval samples from config")
+    parser.add_argument("--use-gpu", action="store_true", help="Override GPU setting from config")
+    parser.add_argument("--output-dir", help="Override output directory from config")
+    parser.add_argument("--epochs", type=int, help="Override epochs from config")
+    parser.add_argument("--learning-rate", type=float, help="Override learning rate from config")
+    parser.add_argument("--num-generations", type=int, help="Override num generations from config")
     
     args = parser.parse_args()
+    
+    # Load configuration
+    try:
+        config = load_config(args.config, 'rl')
+        print(f"Loaded configuration from: {args.config}")
+    except Exception as e:
+        print(f"Error loading configuration: {e}")
+        print("Using default configuration...")
+        from src.utils.config import ModelConfig, RLTrainingConfig, DatasetConfig, HardwareConfig, OutputConfig, EvaluationConfig, RewardConfig
+        config = RLConfig(
+            model=ModelConfig(name="HuggingFaceTB/SmolLM2-135M-Instruct"),
+            training=RLTrainingConfig(
+                learning_rate=5.0e-6,
+                num_train_epochs=1,
+                per_device_train_batch_size=1,
+                gradient_accumulation_steps=8,
+                num_generations=4,
+                logging_steps=2,
+                save_steps=500,
+                eval_steps=500,
+                warmup_steps=50
+            ),
+            dataset=DatasetConfig(
+                name="openai/gsm8k",
+                subset="main",
+                max_train_samples=100,
+                max_eval_samples=50,
+                validation_split=0.1
+            ),
+            hardware=HardwareConfig(use_gpu=False, mixed_precision=False, no_cuda=True),
+            output=OutputConfig(output_dir="./models/rl_output"),
+            evaluation=EvaluationConfig(metric_for_best_model="eval_accuracy"),
+            reward=RewardConfig(
+                function_type="math_accuracy",
+                system_prompt="You are a helpful assistant that solves problems step-by-step. Always include the final numeric answer inside \\boxed{}."
+            )
+        )
+    
+    # Apply command line overrides
+    if args.model:
+        config.model.name = args.model
+    if args.dataset:
+        config.dataset.name = args.dataset
+    if args.subset:
+        config.dataset.subset = args.subset
+    if args.max_train_samples:
+        config.dataset.max_train_samples = args.max_train_samples
+    if args.max_eval_samples:
+        config.dataset.max_eval_samples = args.max_eval_samples
+    if args.use_gpu:
+        config.hardware.use_gpu = True
+    if args.output_dir:
+        config.output.output_dir = args.output_dir
+    if args.epochs:
+        config.training.num_train_epochs = args.epochs
+    if args.learning_rate:
+        config.training.learning_rate = args.learning_rate
+    if args.num_generations:
+        config.training.num_generations = args.num_generations
     
     print("=" * 60)
     print("ONLINE REINFORCEMENT LEARNING (GRPO) EXAMPLE")
     print("=" * 60)
-    print(f"Model: {args.model}")
-    print(f"Dataset: {args.dataset}")
-    print(f"Max training samples: {args.max_train_samples}")
-    print(f"Max evaluation samples: {args.max_eval_samples}")
-    print(f"Generations per prompt: {args.num_generations}")
+    print(f"Model: {config.model.name}")
+    print(f"Dataset: {config.dataset.name}")
+    print(f"Max training samples: {config.dataset.max_train_samples}")
+    print(f"Max evaluation samples: {config.dataset.max_eval_samples}")
+    print(f"Generations per prompt: {config.training.num_generations}")
     
     # Load datasets
     print("\n" + "=" * 40)
     print("LOADING DATASETS")
     print("=" * 40)
     
-    dataset = load_dataset(args.dataset, args.subset)
+    dataset = load_dataset(config.dataset.name, config.dataset.subset)
     train_dataset = dataset["train"]
     eval_dataset = dataset["test"]
     
-    if args.max_train_samples:
-        train_dataset = train_dataset.select(range(min(args.max_train_samples, len(train_dataset))))
-    if args.max_eval_samples:
-        eval_dataset = eval_dataset.select(range(min(args.max_eval_samples, len(eval_dataset))))
+    if config.dataset.max_train_samples:
+        train_dataset = train_dataset.select(range(min(config.dataset.max_train_samples, len(train_dataset))))
+    if config.dataset.max_eval_samples:
+        eval_dataset = eval_dataset.select(range(min(config.dataset.max_eval_samples, len(eval_dataset))))
     
     print(f"Training dataset size: {len(train_dataset)}")
     print(f"Evaluation dataset size: {len(eval_dataset)}")
     
     # Initialize RL pipeline
-    pipeline = RLTrainingPipeline(args.model, use_gpu=args.use_gpu)
+    pipeline = RLTrainingPipeline(config.model.name, use_gpu=config.hardware.use_gpu)
     pipeline.load_model()
     
     # Prepare datasets
@@ -107,12 +159,12 @@ def main():
     pipeline.setup_training(
         train_dataset,
         pipeline.math_reward_function,
-        learning_rate=args.learning_rate,
-        num_train_epochs=args.epochs,
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=8,
-        num_generations=args.num_generations,
-        logging_steps=2
+        learning_rate=config.training.learning_rate,
+        num_train_epochs=config.training.num_train_epochs,
+        per_device_train_batch_size=config.training.per_device_train_batch_size,
+        gradient_accumulation_steps=config.training.gradient_accumulation_steps,
+        num_generations=config.training.num_generations,
+        logging_steps=config.training.logging_steps
     )
     
     # Train the model
@@ -130,7 +182,7 @@ def main():
     )
     
     # Save the trained model
-    pipeline.save_model(args.output_dir)
+    pipeline.save_model(config.output.output_dir)
     
     # Performance summary
     print("\n" + "=" * 60)
@@ -144,7 +196,7 @@ def main():
     print("\n" + "=" * 60)
     print("RL TRAINING COMPLETED SUCCESSFULLY!")
     print("=" * 60)
-    print(f"Trained model saved to: {args.output_dir}")
+    print(f"Trained model saved to: {config.output.output_dir}")
     print("The model has been trained using online RL with mathematical reasoning rewards.")
 
 
