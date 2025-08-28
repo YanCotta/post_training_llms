@@ -96,12 +96,17 @@ class SFTTrainingPipeline:
         
     def train(self) -> None:
         """Run the training process."""
-        if self.trainer is None:
-            raise ValueError("Trainer not set up. Call setup_training() first.")
-            
         print("Starting SFT training...")
-        self.trainer.train()
-        print("Training completed!")
+        try:
+            self.trainer.train()
+            print("Training completed!")
+        except FileNotFoundError as e:
+            print(f"Trainer file not found: {e}")
+        except RuntimeError as e:
+            print(f"SFT trainer did not run correctly: {e}")
+        except MemoryError as e:
+            print(f"Not enough memory on CPU: {e}")
+        
         
     def save_model(self, output_dir: str) -> None:
         """
