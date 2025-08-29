@@ -2,6 +2,7 @@
 Supervised Fine-Tuning (SFT) training pipeline.
 """
 
+import os
 import torch
 from typing import Optional, Dict, Any
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -107,7 +108,6 @@ class SFTTrainingPipeline:
         except MemoryError as e:
             print(f"Not enough memory on CPU: {e}")
         
-        
     def save_model(self, output_dir: str) -> None:
         """
         Save the trained model.
@@ -117,12 +117,29 @@ class SFTTrainingPipeline:
         """
         if self.trainer is None:
             raise ValueError("No trained model to save.")
-            
-        save_model_and_tokenizer(
-            self.trainer.model,
-            self.tokenizer,
-            output_dir
-        )
+        if self.trainer.model is None:
+            raise ValueError("Model not initialized.")
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer not initialized.")
+
+        print("Saving trained model...")
+
+        os.makedirs(output_dir, exist_ok=True)  #auto create dir to avoid filenotfound exception
+
+        try:
+            save_model_and_tokenizer(
+                self.trainer.model,
+                self.tokenizer,
+                output_dir
+            )
+            print(f"Model saved successfully to {output_dir}")
+
+        except PermissionError as e:
+            print(f"Permission denied: {e}")
+        except Exception as e: #generic check for errors, but might come in handy
+            print(f"Error saving model (disk, path or OS issue): {e}")
+
+        
         
     def evaluate_model(self, questions: list, title: str = "SFT Model Output") -> None:
         """
