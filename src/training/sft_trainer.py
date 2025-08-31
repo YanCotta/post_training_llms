@@ -150,20 +150,38 @@ class SFTTrainingPipeline:
             title: Title for the evaluation output
         """
         from ..utils.model_utils import test_model_with_questions
-        
+
         if self.trainer is None:
-            raise ValueError("No trained model to evaluate.")
+            raise ValueError("Evaluation model not found.")
+        
+        if self.trainer and not self.trainer.model:
+            raise AttributeError("Trainer is initialized, but no model found for evaluation.")
+        
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer not found.")
             
         # Move model to CPU if needed for evaluation
         if not self.use_gpu:
+            print("Switching from GPU to CPU...")
             self.trainer.model.to("cpu")
-            
-        test_model_with_questions(
-            self.trainer.model,
-            self.tokenizer,
-            questions,
-            title=title
-        )
+
+        if not questions:
+            raise ValueError("Evaluation questions were not found.")
+
+        try:
+            print("Testing trained model with questions...")
+            test_model_with_questions(
+                self.trainer.model,
+                self.tokenizer,
+                questions,
+                title=title
+            )
+        except (MemoryError, RuntimeError) as e:
+            print(f"Evaluation failed due to resource error: {e}")
+
+        except ModuleNotFoundError as e:
+            print(f"The test module could not be found or imported: {e}")
+
 
 
 def run_sft_example(
