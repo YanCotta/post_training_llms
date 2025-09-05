@@ -4,12 +4,15 @@ Supervised Fine-Tuning (SFT) training pipeline.
 
 import os
 import torch
+import logging
 from typing import Optional, Dict, Any
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from trl import SFTTrainer, SFTConfig
 from datasets import Dataset
 
 from ..utils.model_utils import load_model_and_tokenizer, save_model_and_tokenizer
+
+logger = logging.getLogger(__name__)
 
 
 class SFTTrainingPipeline:
@@ -97,16 +100,16 @@ class SFTTrainingPipeline:
         
     def train(self) -> None:
         """Run the training process."""
-        print("Starting SFT training...")
+        logger.info("Starting SFT training...")
         try:
             self.trainer.train()
-            print("Training completed!")
+            logger.info("Training completed!")
         except FileNotFoundError as e:
-            print(f"Trainer file not found: {e}")
+            logger.error(f"Trainer file not found: {e}")
         except RuntimeError as e:
-            print(f"SFT trainer did not run correctly: {e}")
+            logger.error(f"SFT trainer did not run correctly: {e}")
         except MemoryError as e:
-            print(f"Not enough memory on CPU: {e}")
+            logger.error(f"Not enough memory on CPU: {e}")
         
     def save_model(self, output_dir: str) -> None:
         """
@@ -122,7 +125,7 @@ class SFTTrainingPipeline:
         if self.tokenizer is None:
             raise ValueError("Tokenizer not initialized.")
 
-        print("Saving trained model...")
+        logger.info("Saving trained model...")
 
         os.makedirs(output_dir, exist_ok=True)  #auto create dir to avoid filenotfound exception
 
@@ -132,12 +135,12 @@ class SFTTrainingPipeline:
                 self.tokenizer,
                 output_dir
             )
-            print(f"Model saved successfully to {output_dir}")
+            logger.info(f"Model saved successfully to {output_dir}")
 
         except PermissionError as e:
-            print(f"Permission denied: {e}")
+            logger.error(f"Permission denied: {e}")
         except Exception as e: #generic check for errors, but might come in handy
-            print(f"Error saving model (disk, path or OS issue): {e}")
+            logger.error(f"Error saving model (disk, path or OS issue): {e}")
 
         
         
@@ -162,14 +165,14 @@ class SFTTrainingPipeline:
             
         # Move model to CPU if needed for evaluation
         if not self.use_gpu:
-            print("Switching from GPU to CPU...")
+            logger.info("Switching from GPU to CPU...")
             self.trainer.model.to("cpu")
 
         if not questions:
             raise ValueError("Evaluation questions were not found.")
 
         try:
-            print("Testing trained model with questions...")
+            logger.info("Testing trained model with questions...")
             test_model_with_questions(
                 self.trainer.model,
                 self.tokenizer,
@@ -177,10 +180,10 @@ class SFTTrainingPipeline:
                 title=title
             )
         except (MemoryError, RuntimeError) as e:
-            print(f"Evaluation failed due to resource error: {e}")
+            logger.error(f"Evaluation failed due to resource error: {e}")
 
         except ModuleNotFoundError as e:
-            print(f"The test module could not be found or imported: {e}")
+            logger.error(f"The test module could not be found or imported: {e}")
 
 
 
